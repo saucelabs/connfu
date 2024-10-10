@@ -93,11 +93,16 @@ func testCombinePreservesInnerInterface(t *testing.T, tc net.Conn) {
 		},
 	}
 
+	cfg := Config{
+		UseReaderFrom: true,
+		UseWriterTo:   true,
+	}
+
 	for i := range tests {
 		tc := tests[i]
 
 		t.Run(tc.name, func(t *testing.T) {
-			conn := Combine(tc.outer, tc.inner)
+			conn := CombineWithConfig(tc.outer, tc.inner, cfg)
 
 			if got := conn.RemoteAddr(); got != testAddr {
 				t.Fatalf("RemoteAddr() = %v, want %v", got, testAddr)
@@ -168,11 +173,16 @@ func TestCombineOverloading(t *testing.T) {
 		},
 	}
 
+	cfg := Config{
+		UseReaderFrom: true,
+		UseWriterTo:   true,
+	}
+
 	for i := range tests {
 		tc := tests[i]
 
 		t.Run(tc.name, func(t *testing.T) {
-			conn := Combine(tc.outer, tc.inner)
+			conn := CombineWithConfig(tc.outer, tc.inner, cfg)
 
 			if got := conn.RemoteAddr(); got != testAddr {
 				t.Fatalf("RemoteAddr() = %v, want %v", got, testAddr)
@@ -199,6 +209,52 @@ func TestCombineOverloading(t *testing.T) {
 				if err := v.CloseWrite(); !errors.Is(err, testErr) {
 					t.Fatalf("CloseWrite() = %v, want %v", err, testErr)
 				}
+			}
+		})
+	}
+}
+
+func TestCombineHidesInterfaces(t *testing.T) {
+	tc := testConn{}
+
+	tests := []struct {
+		name  string
+		inner net.Conn
+		cfg   Config
+		flags uint8
+	}{
+		{
+			name: "ReaderFrom",
+			inner: struct {
+				net.Conn
+				io.ReaderFrom
+			}{tc, nopReaderFrom},
+			cfg:   Config{UseReaderFrom: false},
+			flags: 0,
+		},
+		{
+			name: "WriterTo",
+			inner: struct {
+				net.Conn
+				io.WriterTo
+			}{tc, nopWriteTo},
+			cfg:   Config{UseWriterTo: false},
+			flags: 0,
+		},
+	}
+
+	for i := range tests {
+		tc := tests[i]
+
+		t.Run(tc.name, func(t *testing.T) {
+			conn := CombineWithConfig(testConn{}, tc.inner, tc.cfg)
+
+			if got := conn.RemoteAddr(); got != testAddr {
+				t.Fatalf("RemoteAddr() = %v, want %v", got, testAddr)
+			}
+
+			if flags(conn) != 0 {
+				t.Fatalf("flags(conn) = %d, want 0", flags(conn))
 			}
 		})
 	}
