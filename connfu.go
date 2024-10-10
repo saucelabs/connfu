@@ -58,14 +58,23 @@ func flags(conn net.Conn) uint8 {
 //
 //   - io.ReaderFrom
 //   - io.WriterTo
-//   - func CloseWrite()
+//   - func CloseWrite() error
 //
 // and returns a net.Conn that implements the same interfaces.
 //
 // The outer net.Conn may also provide these functions,
 // they are used only if the inner net.Conn also provides them.
 // This allows the implementors of the outer net.Conn to provide implementations that are used when possible.
+//
+// By default, io.WriterTo is disabled and io.ReaderFrom is enabled on Linux only.
+// This is because the splice optimizations in net.TCPConn are only available on Linux,
+// and the io.WriterTo optimization is only used for writer being *net.UnixConn.
 func Combine(outer, inner net.Conn) net.Conn {
+	return CombineWithConfig(outer, inner, DefaultConfig())
+}
+
+// CombineWithConfig should only be use
+func CombineWithConfig(outer, inner net.Conn, cfg Config) net.Conn {
 	readFromMixin := func() readFromMixin {
 		if _, ok := outer.(io.ReaderFrom); ok {
 			return readFromMixin{outer}
@@ -85,7 +94,15 @@ func Combine(outer, inner net.Conn) net.Conn {
 		return closeWriteMixin{inner}
 	}
 
-	switch flags(inner) {
+	flags := flags(inner)
+	if !cfg.UseReaderFrom {
+		flags &^= readerFrom
+	}
+	if !cfg.UseWriterTo {
+		flags &^= writerTo
+	}
+
+	switch flags {
 	case 0:
 		return struct {
 			net.Conn

@@ -35,8 +35,13 @@ func Example() {
 		// Do something with the connection
 	}
 
+	cfg := connfu.Config{
+		UseReaderFrom: true,
+		UseWriterTo:   true,
+	}
+
 	{
-		conn := connfu.Combine(w, new(net.TCPConn))
+		conn := connfu.CombineWithConfig(w, new(net.TCPConn), cfg)
 		if _, ok := conn.(io.ReaderFrom); ok {
 			fmt.Println("Combined with net.TCPConn implements io.ReaderFrom")
 		} else {
@@ -50,7 +55,7 @@ func Example() {
 	}
 
 	{
-		conn := connfu.Combine(w, nil)
+		conn := connfu.CombineWithConfig(w, nil, cfg)
 		if _, ok := conn.(io.ReaderFrom); ok {
 			fmt.Println("Combined with nil implements io.ReaderFrom")
 		} else {
