@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/mmatczuk/connfu"
+	"github.com/saucelabs/connfu"
 )
 
 type connWrapper struct {
